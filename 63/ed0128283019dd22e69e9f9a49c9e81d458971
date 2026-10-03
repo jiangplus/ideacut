@@ -1,0 +1,123 @@
+.gitignore
+  s_b121c903a8b88f::t_a2334aa9380061 1-9
+LICENSE
+  s_b121c903a8b88f::t_9edef6c90266b4 1-202
+README.md
+  s_b121c903a8b88f::t_ddb2389bd690d5 1-72
+electron-builder.yml
+  s_b121c903a8b88f::t_fa99f15236cc03 1-29
+electron.vite.config.ts
+  s_b121c903a8b88f::t_567f1012ecceb6 1-23
+eslint.config.js
+  s_b121c903a8b88f::t_bbf3bca5953711 1-30
+package.json
+  s_b121c903a8b88f::t_ed28509b7b7cd8 1-43
+pnpm-lock.yaml
+  s_b121c903a8b88f::t_c86fddd6e1a321 1-4529
+pnpm-workspace.yaml
+  s_b121c903a8b88f::t_88984f6b77d9c6 1-7
+scripts/after-pack.cjs
+  s_b121c903a8b88f::t_b387a0f677731f 1-11
+scripts/stage.mjs
+  s_b121c903a8b88f::t_f0ae614e63d462 1-84
+src/main/app.ts
+  s_b121c903a8b88f::t_925b3851e40bc2 1-178
+src/main/index.ts
+  s_b121c903a8b88f::t_1425310dc063d5 1-66
+src/main/workflow.ts
+  s_b121c903a8b88f::t_f7bc42b5e61fb7 1-251
+src/pipeline/compile.ts
+  s_b121c903a8b88f::t_dd9a0e9ff6c263 1-190
+src/pipeline/fallbacks.ts
+  s_b121c903a8b88f::t_cf04e4aedcb142 1-118
+src/pipeline/keys.ts
+  s_b121c903a8b88f::t_bd1d10cf643212 1-72
+src/pipeline/llm-json.ts
+  s_b121c903a8b88f::t_61ed6a630bc781 1-86
+src/pipeline/minimax.ts
+  s_b121c903a8b88f::t_c80570f7860785 1-216
+src/pipeline/pipeline.test.ts
+  s_b121c903a8b88f::t_3fce94af7f7d8d 1-63
+src/pipeline/produce.ts
+  s_b121c903a8b88f::t_a5c10593d29f7d 1-173
+src/renderer/api.ts
+  s_b121c903a8b88f::t_9cab0971698303 1-58
+src/renderer/index.html
+  s_b121c903a8b88f::t_3cf482be5a72c5 1-12
+src/renderer/main.tsx
+  s_b121c903a8b88f::t_6439c822b646cc 1-226
+src/renderer/steps.tsx
+  s_b121c903a8b88f::t_c39384a4ea8e80 1-376
+src/renderer/styles.css
+  s_b121c903a8b88f::t_1e3b8654dc7e12 1-146
+src/templates/compare.mgx
+  s_b121c903a8b88f::t_52fa01a3298bfe 1-32
+src/templates/cta.mgx
+  s_b121c903a8b88f::t_a9a7249c3f55e6 1-23
+src/templates/features.mgx
+  s_b121c903a8b88f::t_9cd434d62604e5 1-26
+src/templates/hook.mgx
+  s_b121c903a8b88f::t_4b9c1aa0b6d924 1-23
+src/templates/index.ts
+  s_b121c903a8b88f::t_285b4f7baa663a 1-20
+src/templates/problem.mgx
+  s_b121c903a8b88f::t_10d46a991e9eba 1-25
+src/templates/raw.d.ts
+  s_b121c903a8b88f::t_ca70a1ae7021bb 1-4
+src/templates/screenshot.mgx
+  s_b121c903a8b88f::t_c67ff360003554 1-24
+src/templates/solution.mgx
+  s_b121c903a8b88f::t_dc26c1d8cdd61c 1-38
+src/templates/stats.mgx
+  s_b121c903a8b88f::t_c1be5be4eac054 1-35
+src/templates/steps.mgx
+  s_b121c903a8b88f::t_b8eeadf669ceb5 1-29
+src/templates/title.mgx
+  s_b121c903a8b88f::t_3bbb4391a99acd 1-26
+test/workflow-service.test.ts
+  s_b121c903a8b88f::t_98e6f46bed6508 1-58
+test/workflow.test.ts
+  s_b121c903a8b88f::t_e9e6c43f3f69c9 1-70
+tsconfig.json
+  s_b121c903a8b88f::t_28b200f8388856 1-20
+vitest.config.ts
+  s_b121c903a8b88f::t_1e6dc08e455f94 1-3
+src/pipeline/audio.ts
+  s_b121c903a8b88f::t_fbe532f938d017 1-41
+src/pipeline/demo.ts
+  s_b121c903a8b88f::t_96375b2f6869a5 1-53
+src/pipeline/evercut.ts
+  s_b121c903a8b88f::t_c7ede0fdf30b12 1-121
+src/pipeline/prompts.ts
+  s_b121c903a8b88f::t_b0228837f69872 1-100
+src/pipeline/store.ts
+  s_b121c903a8b88f::t_acd25ebf1a52b5 1-89
+src/pipeline/writing.ts
+  s_b121c903a8b88f::t_df52880934f3be 1-59
+src/preload/index.ts
+  s_b121c903a8b88f::t_49b01a7084b803 1-18
+src/renderer/spec.tsx
+  s_b121c903a8b88f::t_fa2fff9bafa549 1-54
+src/shared/project.ts
+  s_b121c903a8b88f::t_1d01d35265104d 1-141
+src/shared/templates.ts
+  s_b121c903a8b88f::t_3e222e4b5f6352 1-63
+src/templates/common.mgx
+  s_b121c903a8b88f::t_95e90f992b3648 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "63ed0128283019dd22e69e9f9a49c9e81d458971",
+  "prompts": {},
+  "sessions": {
+    "s_b121c903a8b88f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8df65980-4011-4757-ab43-63cc17d25afd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "jiangplus <jiang.plus.times@gmail.com>"
+    }
+  }
+}
