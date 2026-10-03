@@ -12,6 +12,16 @@ export const TEMPLATES = {
     purpose: "Open with a provocative question or bold statement that names the pain.",
     fields: z.object({ line: short(40) }),
   },
+  moment: {
+    label: "故事瞬间",
+    purpose: "A concrete story beat: a person at a specific time and place, mid-struggle or mid-win. Kicker sets the scene (\"Fri 23:47 · office\"), one emoji, one vivid line.",
+    fields: z.object({ kicker: short(20), emoji: z.string().min(1).max(4), line: short(36), sub: z.string().max(40).optional() }),
+  },
+  quote: {
+    label: "用户原话",
+    purpose: "Something the protagonist or a user would say, in their own words (a complaint before, or relief after). Never attribute to a real named person or company.",
+    fields: z.object({ quote: short(48), who: short(24) }),
+  },
   title: {
     label: "产品亮相",
     purpose: "Reveal the product name and its one-line promise.",

@@ -4,10 +4,11 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { IdeaProject } from "../shared/project";
+import type { Concept, IdeaProject } from "../shared/project";
 import { narrationLength } from "../shared/project";
 import { ambientPad, silence } from "./audio";
-import { fallbackPlan, fallbackQuestions, fallbackStoryboard } from "./fallbacks";
+import { ARCHETYPES } from "../shared/archetypes";
+import { fallbackConcepts, fallbackExpansion, fallbackPlan, fallbackQuestions, fallbackStoryboard } from "./fallbacks";
 import type { ChatMessage, Provider, SpeechResult, Voice } from "./minimax";
 
 export class DemoProvider implements Provider {
@@ -16,9 +17,17 @@ export class DemoProvider implements Provider {
   constructor(private readonly project: () => IdeaProject) {}
 
   async chat(messages: ChatMessage[]): Promise<string> {
-    const task = messages[0]?.content.match(/^TASK: (\w+)/)?.[1];
+    const system = messages[0]?.content ?? "";
+    const task = system.match(/^TASK: ([\w-]+)/)?.[1];
     const p = this.project();
-    const body = task === "questions" ? { questions: fallbackQuestions(p) } : task === "plan" ? fallbackPlan(p) : task === "storyboard" ? { scenes: fallbackStoryboard(p) } : {};
+    const body =
+      task === "questions" ? { questions: fallbackQuestions(p) }
+      : task === "plan" ? fallbackPlan(p)
+      : task === "concepts" ? { concepts: fallbackConcepts(p, ARCHETYPES.filter((a) => system.match(/^ARCHETYPES: (.*)$/m)?.[1]?.split(",").includes(a.id))) }
+      : task === "expand" ? fallbackExpansion(p, { hook: messages[1]?.content.match(/^HOOK: (.*)$/m)?.[1] ?? "" } as Concept)
+      : task === "storyboard" ? { scenes: fallbackStoryboard(p) }
+      // Judges: no opinion, so the original order stands.
+      : { scores: [] };
     return "```json\n" + JSON.stringify(body) + "\n```";
   }
 

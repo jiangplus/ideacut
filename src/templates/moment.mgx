@@ -1,0 +1,30 @@
+export default defineMotion({
+  schema: z.object({
+    kicker: z.string().default("周五 23:47 · 办公室"),
+    emoji: z.string().default("😩"),
+    line: z.string().default("第三遍改同一页 PPT"),
+    sub: z.string().optional(),
+    ...theme,
+  }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u } = useLayout();
+    const pop = useIn(10, 9);
+    const bob = Math.sin(frame / 22) * 6 * u;
+    const drift = interpolate(frame, [0, DURATION], [0, -30 * u]);
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad style={{ alignItems: "center", textAlign: "center", transform: `translateY(${drift}px)` }}>
+          <Rise>
+            <div style={{ fontFamily: FONT, fontSize: 34 * u, fontWeight: 700, letterSpacing: 4 * u, color: p.accent, padding: `${10 * u}px ${24 * u}px`, border: `${2 * u}px solid ${p.accent}`, borderRadius: 999 }}>{p.kicker}</div>
+          </Rise>
+          <div style={{ fontSize: 190 * u, lineHeight: 1.1, margin: `${36 * u}px 0 ${18 * u}px`, transform: `scale(${pop}) translateY(${bob}px)` }}>{p.emoji}</div>
+          <Rise delay={18}><Title t={p} size={84} style={{ textAlign: "center" }}>{p.line}</Title></Rise>
+          {p.sub ? <Rise delay={30}><Body t={p} size={40} style={{ marginTop: 22 * u, textAlign: "center" }}>{p.sub}</Body></Rise> : null}
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

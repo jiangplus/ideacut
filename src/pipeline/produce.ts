@@ -28,6 +28,8 @@ export interface ProduceContext {
   engine: EverCutEngine;
   /** Called whenever progress changes; persist and forward to the UI. */
   onRun: (run: Run) => void;
+  /** Steps already finished before production (the writing stages of a one-click run). */
+  before?: ProduceStep[];
 }
 
 const sha = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);
@@ -38,8 +40,8 @@ export function inputHash(p: IdeaProject): string {
 
 export async function produce(ctx: ProduceContext): Promise<Run> {
   const { project: p, dir, provider, engine } = ctx;
-  const steps: ProduceStep[] = PRODUCE_STEPS.map((s) => ({ ...s, status: "pending", detail: "" }));
-  const run: Run = { status: "running", steps, previews: [], startedAt: new Date().toISOString() };
+  const steps: ProduceStep[] = [...(ctx.before ?? []), ...PRODUCE_STEPS.map((s) => ({ ...s, status: "pending" as const, detail: "" }))];
+  const run: Run = { status: "running", steps, previews: [], startedAt: p.run?.status === "running" && ctx.before ? p.run.startedAt : new Date().toISOString() };
   const emit = () => ctx.onRun(structuredClone(run));
   const step = (key: string) => steps.find((s) => s.key === key)!;
   const begin = (key: string, detail = "") => {

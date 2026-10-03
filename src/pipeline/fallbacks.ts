@@ -1,8 +1,9 @@
 // Deterministic content used when the model fails repeatedly (or in demo mode), so the
 // workflow always reaches a video. Quality is basic; the user can edit everything.
 
-import type { IdeaProject, Plan, Question, Scene } from "../shared/project";
-import { narrationBudget, narrationLength } from "../shared/project";
+import type { Concept, IdeaProject, Plan, Question, Scene } from "../shared/project";
+import { chosenConcept, narrationBudget, narrationLength } from "../shared/project";
+import type { Archetype } from "../shared/archetypes";
 
 const zh = (p: IdeaProject) => p.spec.language === "zh";
 
@@ -73,16 +74,44 @@ export function fallbackPlan(p: IdeaProject): Plan {
   };
 }
 
+/** One plain concept per archetype, built from the plan. */
+export function fallbackConcepts(p: IdeaProject, archetypes: Archetype[]): Omit<Concept, "id" | "verdict" | "protagonist" | "beats" | "ending">[] {
+  const plan = p.plan ?? fallbackPlan(p);
+  const c = zh(p);
+  return archetypes.map((a) => ({
+    archetype: a.id,
+    title: c ? `${a.label}：${short(plan.name, 16)}` : `${a.label}: ${short(plan.name, 16)}`,
+    hook: short(c ? `${plan.audience}，又一次卡在这里。` : `Stuck here again.`, 40),
+    logline: short(c ? `${plan.audience}被「${short(plan.problem, 30)}」困住，直到用上${plan.name}。` : `${plan.audience} are stuck with "${short(plan.problem, 40)}" until ${plan.name}.`, 150),
+  }));
+}
+
+/** Plain beats for a concept, built from the plan. */
+export function fallbackExpansion(p: IdeaProject, concept: Concept): Pick<Concept, "protagonist" | "beats" | "ending"> {
+  const plan = p.plan ?? fallbackPlan(p);
+  const c = zh(p);
+  return {
+    protagonist: plan.audience,
+    beats: c
+      ? [`${concept.hook}${short(plan.problem, 40)}`, "试过的办法都不管用", `${plan.name}出现：${short(plan.oneLiner, 30)}`, `结果：${short(plan.differentiation, 30)}`]
+      : [`${concept.hook} ${short(plan.problem, 60)}`, "Nothing they try works", `${plan.name} arrives: ${short(plan.oneLiner, 50)}`, `The result: ${short(plan.differentiation, 50)}`],
+    ending: c ? `回到开头那一刻，这次很轻松。${plan.cta}` : `Back to that moment, easy this time. ${plan.cta}`,
+  };
+}
+
 const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 export function fallbackStoryboard(p: IdeaProject): Scene[] {
   const plan = p.plan ?? fallbackPlan(p);
   const c = zh(p);
   const image = p.idea.materials[0]?.id;
+  const concept = chosenConcept(p);
   const scenes: Omit<Scene, "id">[] = [
-    { template: "hook", narration: c ? `${plan.problem}` : plan.problem, fields: { line: short(c ? `${plan.audience}，还在忍受这些吗？` : `Still putting up with this?`, 40) } },
+    concept
+      ? { template: "moment", narration: `${concept.hook}${c ? "" : " "}${plan.problem}`, fields: { kicker: short(concept.protagonist || plan.audience, 20), emoji: "😩", line: short(concept.hook, 36) } }
+      : { template: "hook", narration: c ? `${plan.problem}` : plan.problem, fields: { line: short(c ? `${plan.audience}，还在忍受这些吗？` : `Still putting up with this?`, 40) } },
     { template: "title", narration: c ? `${plan.name}：${plan.oneLiner}。` : `${plan.name}: ${plan.oneLiner}.`, fields: { name: short(plan.name, 24), tagline: short(plan.oneLiner, 40) } },
-    { template: "solution", narration: plan.solution, fields: { heading: c ? "我们的方案" : "Our solution", body: short(plan.solution, 80), ...(image ? { image } : {}) } },
+    { template: "solution", narration: plan.solution, fields: { heading: c ? "我们的方案" : "Our solution", body: short(plan.features.slice(0, 3).join(" · "), 80), ...(image ? { image } : {}) } },
     {
       template: "features",
       narration: c ? `核心功能：${plan.features.slice(0, 3).join("，")}。` : `Key features: ${plan.features.slice(0, 3).join(", ")}.`,

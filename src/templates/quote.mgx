@@ -1,0 +1,26 @@
+export default defineMotion({
+  schema: z.object({ quote: z.string().default("我只是想把会开完，不想再整理纪要了。"), who: z.string().default("一位产品经理"), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u } = useLayout();
+    // Reveal the quote a few characters at a time, like it is being spoken.
+    const chars = [...p.quote];
+    const shown = Math.min(chars.length, Math.floor(Math.max(0, frame - 10) / 1.6));
+    const mark = useIn(0, 12);
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 260 * u, lineHeight: 0.8, color: p.accent, opacity: mark, transform: `translateY(${(1 - mark) * 30 * u}px)` }}>“</div>
+          <Title t={p} size={72} style={{ fontWeight: 700, marginTop: -10 * u }}>
+            {chars.map((c, i) => <span key={i} style={{ opacity: i < shown ? 1 : 0.12 }}>{c}</span>)}
+          </Title>
+          <Rise delay={Math.round(10 + chars.length * 1.6)}>
+            <Body t={p} size={38} style={{ marginTop: 40 * u, color: p.accent, opacity: 1 }}>— {p.who}</Body>
+          </Rise>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

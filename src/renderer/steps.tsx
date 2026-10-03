@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { narrationBudget, narrationLength, sceneIssues, type Answer, type IdeaProject, type Plan, type Scene } from "../shared/project";
+import { chosenConcept, narrationBudget, narrationLength, sceneIssues, type Answer, type Concept, type IdeaProject, type Plan, type Scene } from "../shared/project";
+import { ARCHETYPES, RUBRIC } from "../shared/archetypes";
 import { TEMPLATES, TEMPLATE_IDS, type TemplateId } from "../shared/templates";
 import { api, fileUrl, relInProject } from "./api";
 import type { Ctx } from "./main";
@@ -34,12 +35,21 @@ function Field({ label, value, onSave, rows = 1, hint }: { label: string; value:
   );
 }
 
+/** One click to a finished video: whatever is missing gets written, then produced. */
+export async function autopilot(ctx: Ctx) {
+  ctx.go("video");
+  const r = await ctx.run("一键成片中…", () => api.autopilot(ctx.project.id));
+  if (r) ctx.setProject(r);
+}
+
+const STORY_LABEL = "AI 正在梳理要点，并按 20 种叙事方式构思故事、评委打分…（约 1 分钟）";
+
 // ---------- 1. Idea ----------
 
 export function IdeaStep({ ctx }: { ctx: Ctx }) {
   const { project: p, setProject } = ctx;
   const save = (patch: object) => ctx.run("保存中", () => api.update(p.id, patch).then(setProject));
-  const next = async () => {
+  const ask = async () => {
     if (p.questions && !p.stale.includes("questions")) return ctx.go("questions");
     const r = await ctx.run("AI 正在思考要问你的问题…", () => api.questions(p.id));
     if (r) {
@@ -47,6 +57,15 @@ export function IdeaStep({ ctx }: { ctx: Ctx }) {
       ctx.go("questions");
     }
   };
+  const story = async () => {
+    if (p.concepts?.length && !p.stale.includes("plan")) return ctx.go("plan");
+    const r = await ctx.run(STORY_LABEL, () => api.plan(p.id));
+    if (r) {
+      setProject(r.project);
+      ctx.go("plan");
+    }
+  };
+  const ready = p.idea.text.trim().length >= 4;
   return (
     <div className="step">
       <h2>说说你的想法</h2>
@@ -72,9 +91,9 @@ export function IdeaStep({ ctx }: { ctx: Ctx }) {
       <h3>视频设置</h3>
       <SpecForm spec={p.spec} onChange={(spec) => void save({ spec })} />
       <Footer ctx={ctx}>
-        <button className="primary" disabled={p.idea.text.trim().length < 4} onClick={() => void next()}>
-          下一步：AI 追问 →
-        </button>
+        <button disabled={!ready} onClick={() => void ask()} title="回答 4–5 个选择题，故事会更贴近你的真实情况">回答几个问题（可选）</button>
+        <button disabled={!ready} onClick={() => void story()}>构思故事 →</button>
+        <button className="primary" disabled={!ready} onClick={() => void autopilot(ctx)} title="自动完成构思、分镜和成片，之后每一步都还能改">⚡ 一键成片</button>
       </Footer>
     </div>
   );
@@ -90,7 +109,7 @@ export function QuestionsStep({ ctx }: { ctx: Ctx }) {
   const set = (a: Answer) => setAnswers([...answers.filter((x) => x.questionId !== a.questionId), a]);
   const next = async () => {
     await api.update(p.id, { answers });
-    const r = await ctx.run("AI 正在写项目方案…", () => api.plan(p.id));
+    const r = await ctx.run(STORY_LABEL, () => api.plan(p.id));
     if (r) {
       setProject(r.project);
       ctx.go("plan");
@@ -126,7 +145,7 @@ export function QuestionsStep({ ctx }: { ctx: Ctx }) {
       <Footer ctx={ctx}>
         <button onClick={() => void ctx.run("换一批问题…", () => api.questions(p.id).then((r) => setProject(r.project)))}>换一批问题</button>
         <button className="primary" onClick={() => void next()}>
-          下一步：生成方案 →
+          下一步：构思故事 →
         </button>
       </Footer>
     </div>
@@ -150,37 +169,94 @@ const PLAN_FIELDS: { key: keyof Plan; label: string; rows?: number; list?: boole
   { key: "contact", label: "链接 / 联系方式" },
 ];
 
+const archetypeLabel = (id: string) => ARCHETYPES.find((a) => a.id === id)?.label ?? id;
+
+function ConceptCard({ c, rank, on, onPick }: { c: Concept; rank: number; on: boolean; onPick: () => void }) {
+  return (
+    <div className={`concept ${on ? "on" : ""}`} onClick={onPick}>
+      <div className="concept-head">
+        <b>#{rank}</b>
+        <span className="tag">{archetypeLabel(c.archetype)}</span>
+        <span className="concept-title">{c.title}</span>
+        <span className="grow" />
+        {c.score !== undefined && <span className="score">{c.score}</span>}
+        {on && <span className="picked">✓ 已选</span>}
+      </div>
+      <div className="hook">“{c.hook}”</div>
+      <div className="logline">{c.logline}</div>
+      {on && (
+        <>
+          <ol className="beats">{c.beats.map((b, i) => <li key={i}>{b}</li>)}</ol>
+          {c.ending && <div className="ending">结尾：{c.ending}</div>}
+        </>
+      )}
+      {c.scores && (
+        <div className="bars">
+          {RUBRIC.map((r) => (
+            <span key={r.key} title={r.ask}>
+              {r.label}
+              <i><em style={{ width: `${(c.scores![r.key] ?? 0) * 10}%` }} /></i>
+            </span>
+          ))}
+        </div>
+      )}
+      {c.verdict && <div className="verdict">评委：{c.verdict}</div>}
+    </div>
+  );
+}
+
 export function PlanStep({ ctx }: { ctx: Ctx }) {
   const { project: p, setProject } = ctx;
+  const [all, setAll] = useState(false);
   if (!p.plan) return null;
   const plan = p.plan;
+  const concepts = p.concepts ?? [];
+  const chosen = chosenConcept(p);
+  const shown = all ? concepts : concepts.filter((c, i) => i < 3 || c.id === chosen?.id);
   const save = (key: keyof Plan, v: string, list?: boolean) => {
     const value = list ? v.split("\n").map((s) => s.trim()).filter(Boolean) : v;
     void ctx.run("保存中", () => api.update(p.id, { plan: { ...plan, [key]: value } }).then(setProject));
   };
+  const pick = (id: string) => id !== chosen?.id && void ctx.run("保存中", () => api.update(p.id, { conceptId: id }).then(setProject));
+  const rethink = () => void ctx.run("AI 正在重新构思 20 个故事…", () => api.concepts(p.id).then((r) => setProject(r.project)));
   const next = async () => {
     if (p.scenes && !p.stale.includes("storyboard")) return ctx.go("storyboard");
-    const r = await ctx.run("AI 正在写分镜脚本…", () => api.storyboard(p.id));
+    const r = await ctx.run("AI 正在按选中的故事写 3 稿分镜，并挑出最好的一稿…", () => api.storyboard(p.id));
     if (r) {
       setProject(r.project);
       ctx.go("storyboard");
     }
   };
   return (
-    <div className="step">
-      <h2>项目方案</h2>
-      <p className="muted">视频会根据这份方案来写。直接修改任何一项。</p>
-      <StaleNote ctx={ctx} step="plan">想法或回答有变化，可以重新生成方案。</StaleNote>
-      <div className="plan-grid">
-        {PLAN_FIELDS.map((f) => (
-          <Field key={f.key} label={f.label} rows={f.rows} value={f.list ? (plan[f.key] as string[]).join("\n") : String(plan[f.key] ?? "")} onSave={(v) => save(f.key, v, f.list)} />
-        ))}
-      </div>
+    <div className="step wide">
+      <h2>选一个故事</h2>
+      <p className="muted">
+        AI 用 {concepts.length || 20} 种不同的叙事方式各构思了一个故事，评委从开场、清晰、具体、情绪、可信、可拍六个维度打分。默认用最高分的，点击卡片可以换。
+      </p>
+      <StaleNote ctx={ctx} step="plan">想法或回答有变化，可以重新构思。</StaleNote>
+      {concepts.length === 0 ? (
+        <div className="empty">
+          <p>还没有故事方案。</p>
+          <button className="primary" onClick={rethink}>构思故事</button>
+        </div>
+      ) : (
+        <div className="concepts">
+          {shown.map((c) => <ConceptCard key={c.id} c={c} rank={concepts.indexOf(c) + 1} on={c.id === chosen?.id} onPick={() => pick(c.id)} />)}
+          {concepts.length > shown.length || all ? <button className="ghost" onClick={() => setAll(!all)}>{all ? "收起" : `查看全部 ${concepts.length} 个故事`}</button> : null}
+        </div>
+      )}
+      <details className="facts">
+        <summary>项目要点（故事只会使用这里的事实，可以直接修改）</summary>
+        <div className="plan-grid">
+          {PLAN_FIELDS.map((f) => (
+            <Field key={f.key} label={f.label} rows={f.rows} value={f.list ? (plan[f.key] as string[]).join("\n") : String(plan[f.key] ?? "")} onSave={(v) => save(f.key, v, f.list)} />
+          ))}
+        </div>
+      </details>
       <Footer ctx={ctx}>
-        <button onClick={() => void ctx.run("重新生成方案…", () => api.plan(p.id).then((r) => setProject(r.project)))}>重新生成</button>
-        <button className="primary" onClick={() => void next()}>
-          下一步：写分镜 →
-        </button>
+        <button onClick={rethink}>再想 20 个</button>
+        <button disabled={!chosen} onClick={() => void next()}>写分镜 →</button>
+        <button className="primary" disabled={!chosen} onClick={() => void autopilot(ctx)}>⚡ 一键成片</button>
       </Footer>
     </div>
   );
@@ -190,6 +266,11 @@ export function PlanStep({ ctx }: { ctx: Ctx }) {
 
 const FIELD_LABELS: Record<string, string> = {
   line: "画面文字",
+  kicker: "时间地点",
+  emoji: "表情",
+  sub: "副标题",
+  quote: "原话",
+  who: "谁说的",
   name: "产品名",
   tagline: "标语",
   heading: "标题",
@@ -284,7 +365,8 @@ export function StoryboardStep({ ctx }: { ctx: Ctx }) {
         每个镜头 = 一个动画模板 + 一段旁白。旁白共 {total} {p.spec.language === "zh" ? "字" : "词"}，目标约 {budget.chars}（{p.spec.duration} 秒）
         <span className={`meter ${ratio > 1.3 || ratio < 0.6 ? "warn" : ""}`}><i style={{ width: `${Math.min(100, ratio * 70)}%` }} /></span>
       </p>
-      <StaleNote ctx={ctx} step="storyboard">方案有变化，可以重新生成分镜。</StaleNote>
+      <StaleNote ctx={ctx} step="storyboard">故事或要点有变化，可以重新生成分镜。</StaleNote>
+      {chosenConcept(p) && <p className="small muted">按故事「{chosenConcept(p)!.title}」写成。</p>}
       {scenes.map((s, i) => (
         <SceneEditor
           key={s.id}
@@ -302,7 +384,7 @@ export function StoryboardStep({ ctx }: { ctx: Ctx }) {
         />
       ))}
       <Footer ctx={ctx}>
-        <button onClick={() => void ctx.run("重新写分镜…", () => api.storyboard(p.id).then((r) => setProject(r.project)))}>重新生成</button>
+        <button onClick={() => void ctx.run("AI 正在重写 3 稿分镜并择优…", () => api.storyboard(p.id).then((r) => setProject(r.project)))}>重新生成</button>
         <button className="primary" disabled={bad || scenes.length === 0} onClick={() => void produce()}>
           生成视频 →
         </button>

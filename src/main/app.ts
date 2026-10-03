@@ -4,6 +4,7 @@ import { dirname, join, normalize, relative } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from "electron";
+import { z } from "zod";
 import type { IdeaProject } from "../shared/project";
 import { Workflow, type ProjectPatch } from "./workflow";
 
@@ -52,13 +53,19 @@ function serveProjectFile(request: Request): Response {
   return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, { headers: { "content-type": type, "content-length": String(size), "accept-ranges": "bytes", "cache-control": "no-store" } });
 }
 
+/** Validation errors become one readable line per problem instead of zod's JSON dump. */
+function errorText(err: unknown): string {
+  if (err instanceof z.ZodError) return "内容格式不对：\n" + err.issues.map((i) => `${i.path.join(".") || "(root)"}：${i.message}`).join("\n");
+  return (err as Error).message;
+}
+
 /** Wraps a handler so errors reach the UI as { error } instead of rejected IPC calls. */
 function handle(channel: string, fn: (...args: any[]) => unknown) {
   ipcMain.handle(channel, async (_e, ...args) => {
     try {
       return { ok: true, value: await fn(...args) };
     } catch (err) {
-      return { ok: false, error: (err as Error).message };
+      return { ok: false, error: errorText(err) };
     }
   });
 }
@@ -81,7 +88,9 @@ function registerIpc() {
   handle("step:questions", (id: string) => workflow.questions(id));
   handle("step:plan", (id: string) => workflow.plan(id));
   handle("step:storyboard", (id: string) => workflow.storyboard(id));
+  handle("step:concepts", (id: string) => workflow.concepts(id));
   handle("step:produce", (id: string) => workflow.produce(id));
+  handle("step:autopilot", (id: string) => workflow.autopilot(id));
   handle("project:running", (id: string) => workflow.isRunning(id));
   handle("video:saveAs", async (id: string) => {
     const p = workflow.load(id);

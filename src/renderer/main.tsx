@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { IdeaProject, Spec, StepKey } from "../shared/project";
 import { api, type AppStatus, type ProjectSummary } from "./api";
-import { IdeaStep, PlanStep, QuestionsStep, StoryboardStep, VideoStep } from "./steps";
+import { autopilot, IdeaStep, PlanStep, QuestionsStep, StoryboardStep, VideoStep } from "./steps";
 import { SpecForm } from "./spec";
 import "./styles.css";
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "idea", label: "想法" },
   { key: "questions", label: "追问" },
-  { key: "plan", label: "方案" },
+  { key: "plan", label: "故事" },
   { key: "storyboard", label: "分镜" },
   { key: "video", label: "视频" },
 ];
@@ -85,11 +85,21 @@ function Settings({ status, onClose, onSaved }: { status: AppStatus; onClose: ()
   );
 }
 
-function NewProject({ onCreated, status }: { onCreated: (p: IdeaProject) => void; status: AppStatus }) {
+function NewProject({ onCreated, status }: { onCreated: (p: IdeaProject, quick: boolean) => void; status: AppStatus }) {
   const [text, setText] = useState("");
   const [spec, setSpec] = useState<Partial<Spec>>({ duration: 60, aspect: "16:9", language: "zh", theme: "midnight", music: true, captions: true });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const start = async (quick: boolean) => {
+    setBusy(true);
+    try {
+      onCreated(await api.create(text, spec), quick);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="welcome">
       <h1>
@@ -99,22 +109,14 @@ function NewProject({ onCreated, status }: { onCreated: (p: IdeaProject) => void
       <textarea className="idea-input" autoFocus rows={4} value={text} placeholder="用一两句话描述你的项目，例如：PPT 生成器——上传文档，一键生成可编辑的演示文稿" onChange={(e) => setText(e.target.value)} />
       <SpecForm spec={spec} onChange={(s) => setSpec({ ...spec, ...s })} compact />
       {err && <p className="err">{err}</p>}
-      <button
-        className="primary big"
-        disabled={busy || text.trim().length < 4}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            onCreated(await api.create(text, spec));
-          } catch (e) {
-            setErr((e as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        开始
-      </button>
+      <div className="start">
+        <button disabled={busy || text.trim().length < 4} onClick={() => void start(false)} title="逐步确认问题、故事和分镜">
+          逐步打磨
+        </button>
+        <button className="primary big" disabled={busy || text.trim().length < 4} onClick={() => void start(true)} title="AI 构思 20 个故事选出最好的，写分镜，直接成片；之后每一步都还能改">
+          ⚡ 一键成片
+        </button>
+      </div>
       {status.demo && <p className="muted small">未设置 MiniMax Key：将以演示模式运行（规则生成文案、无声配音），可在左下角“设置”中添加。</p>}
     </div>
   );
@@ -192,7 +194,15 @@ function App() {
       <main className="main">
         {status.evercut.problems.length > 0 && <div className="banner err">{status.evercut.problems[0]}</div>}
         {!ctx ? (
-          <NewProject status={status} onCreated={(p) => { setProject(p); setStep("idea"); refreshList(); }} />
+          <NewProject
+            status={status}
+            onCreated={(p, quick) => {
+              setProject(p);
+              setStep("idea");
+              refreshList();
+              if (quick) void autopilot({ project: p, setProject, go: setStep, busy, run, status });
+            }}
+          />
         ) : (
           <>
             <header className="phead">

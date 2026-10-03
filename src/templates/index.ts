@@ -3,6 +3,8 @@
 import type { TemplateId } from "../shared/templates";
 import common from "./common.mgx?raw";
 import hook from "./hook.mgx?raw";
+import moment from "./moment.mgx?raw";
+import quote from "./quote.mgx?raw";
 import title from "./title.mgx?raw";
 import problem from "./problem.mgx?raw";
 import solution from "./solution.mgx?raw";
@@ -13,7 +15,7 @@ import stats from "./stats.mgx?raw";
 import compare from "./compare.mgx?raw";
 import cta from "./cta.mgx?raw";
 
-const bodies: Record<TemplateId, string> = { hook, title, problem, solution, features, steps, screenshot, stats, compare, cta };
+const bodies: Record<TemplateId, string> = { hook, moment, quote, title, problem, solution, features, steps, screenshot, stats, compare, cta };
 
 export function templateSource(id: TemplateId): string {
   return `${common}\n\n// ---- ${id} ----\n${bodies[id]}`;

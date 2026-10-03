@@ -3,12 +3,13 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { IdeaProject, Spec, type Answer, type Idea, type Plan, type Scene, type StepKey } from "../shared/project";
+import { chosenConcept, IdeaProject, Spec, type Answer, type Idea, type Plan, type ProduceStep, type Run, type Scene, type StepKey } from "../shared/project";
 import { DemoProvider } from "../pipeline/demo";
 import { checkEverCutBuilt, EverCutEngine, locateEverCut } from "../pipeline/evercut";
 import { getMiniMaxBaseUrl, getMiniMaxKey, maskKey, setMiniMaxBaseUrl, setMiniMaxKey } from "../pipeline/keys";
-import { detectRegion, MiniMax, type Provider, type Voice } from "../pipeline/minimax";
-import { inputHash, produce } from "../pipeline/produce";
+import { callLog, detectRegion, MiniMax, type Provider, type Voice } from "../pipeline/minimax";
+import { inputHash, produce, PRODUCE_STEPS } from "../pipeline/produce";
+import { expandConcept, generateConcepts } from "../pipeline/story";
 import { downstream, ProjectStore } from "../pipeline/store";
 import { generatePlan, generateQuestions, generateStoryboard } from "../pipeline/writing";
 
@@ -18,8 +19,16 @@ export interface ProjectPatch {
   idea?: Partial<Idea>;
   answers?: Answer[];
   plan?: Plan;
+  conceptId?: string;
   scenes?: Scene[];
 }
+
+/** Writing stages shown before production in a one-click run. */
+const WRITE_STEPS = [
+  { key: "plan", label: "梳理项目要点" },
+  { key: "concepts", label: "构思 20 个故事，评委打分" },
+  { key: "storyboard", label: "写分镜（3 稿择优）" },
+];
 
 export class Workflow {
   readonly store = new ProjectStore();
@@ -114,8 +123,9 @@ export class Workflow {
   }
 
   async create(text: string, spec: Partial<Spec>) {
+    // Demo voices are placeholders; an empty id is resolved to a real voice at production time.
     const voice = spec.voiceId || (await this.defaultVoice(spec.language ?? "zh"));
-    return this.store.create({ text, spec: { ...spec, voiceId: voice } });
+    return this.store.create({ text, spec: { ...spec, voiceId: isDemoVoice(voice) ? "" : voice } });
   }
 
   private async defaultVoice(language: "zh" | "en"): Promise<string> {
@@ -126,6 +136,24 @@ export class Workflow {
     } catch {
       return "";
     }
+  }
+
+  /**
+   * A voice MiniMax will accept for this spec. The saved id can be empty (language changed),
+   * a demo placeholder (project made before a key was set) or from another platform's list.
+   */
+  private async usableVoice(spec: Spec): Promise<string> {
+    const want = spec.voiceId ?? "";
+    let known: Voice[] | undefined;
+    try {
+      known = await this.voices();
+    } catch {
+      /* list unavailable: trust a real-looking saved id */
+    }
+    if (want && !isDemoVoice(want) && (!known || known.some((v) => v.id === want))) return want;
+    const fallback = await this.defaultVoice(spec.language);
+    if (!fallback) throw new Error("无法获取 MiniMax 音色列表，请检查网络后重试");
+    return fallback;
   }
 
   load(id: string) {
@@ -163,6 +191,10 @@ export class Workflow {
       next.plan = patch.plan;
       touch("plan");
     }
+    if (patch.conceptId !== undefined && patch.conceptId !== chosenConcept(p)?.id) {
+      next.conceptId = patch.conceptId;
+      touch("plan");
+    }
     if (patch.scenes) {
       next.scenes = patch.scenes;
       touch("storyboard");
@@ -190,48 +222,148 @@ export class Workflow {
   }
 
   async questions(id: string) {
+    return this.logged(id, () => this.questionsStep(id));
+  }
+
+  private async questionsStep(id: string) {
     const p = this.store.load(id);
     const provider = await this.provider(id);
     const r = await generateQuestions(provider, p);
     return { project: this.finishStep(p, "questions", (x) => ({ ...x, questions: r.value, answers: [], demo: provider.demo }), !!p.questions), usedFallback: r.usedFallback };
   }
 
-  async plan(id: string) {
+  /** The plan, then story concepts drafted and ranked from it (the "story" step). */
+  async plan(id: string, onPlanned?: () => void) {
+    return this.logged(id, () => this.planStep(id, onPlanned));
+  }
+
+  private async planStep(id: string, onPlanned?: () => void) {
     const p = this.store.load(id);
     const provider = await this.provider(id);
     const r = await generatePlan(provider, p);
-    return { project: this.finishStep(p, "plan", (x) => ({ ...x, plan: r.value, title: x.title || r.value.name, demo: provider.demo }), !!p.plan), usedFallback: r.usedFallback };
+    const withPlan = this.store.save({ ...p, plan: r.value, title: p.title || r.value.name });
+    onPlanned?.();
+    const c = await generateConcepts(provider, withPlan);
+    const project = this.finishStep(p, "plan", (x) => ({ ...x, plan: r.value, concepts: c.concepts, conceptId: c.concepts[0]?.id, title: x.title || r.value.name, demo: provider.demo }), !!p.plan);
+    return { project, usedFallback: r.usedFallback || c.fallbackBatches > 0 };
+  }
+
+  /** A fresh set of story concepts for the current plan. */
+  async concepts(id: string) {
+    return this.logged(id, () => this.conceptsStep(id));
+  }
+
+  private async conceptsStep(id: string) {
+    const p = this.store.load(id);
+    if (!p.plan) throw new Error("请先生成方案");
+    const provider = await this.provider(id);
+    const c = await generateConcepts(provider, p);
+    const project = this.finishStep(p, "plan", (x) => ({ ...x, concepts: c.concepts, conceptId: c.concepts[0]?.id }), !!p.scenes);
+    return { project, usedFallback: c.fallbackBatches > 0 };
   }
 
   async storyboard(id: string) {
-    const p = this.store.load(id);
+    return this.logged(id, () => this.storyboardStep(id));
+  }
+
+  private async storyboardStep(id: string) {
+    let p = this.store.load(id);
     const provider = await this.provider(id);
+    // A concept the user picked from the list hasn't been expanded into beats yet.
+    const chosen = chosenConcept(p);
+    if (chosen && !chosen.beats.length) {
+      const expanded = await expandConcept(provider, p, chosen);
+      p = this.store.save({ ...p, concepts: p.concepts!.map((c) => (c.id === expanded.id ? expanded : c)) });
+    }
     const r = await generateStoryboard(provider, p);
-    return { project: this.finishStep(p, "storyboard", (x) => ({ ...x, scenes: r.value, demo: provider.demo }), !!p.scenes), usedFallback: r.usedFallback };
+    return { project: this.finishStep(p, "storyboard", (x) => ({ ...x, scenes: r.value, demo: provider.demo }), !!p.scenes), usedFallback: r.usedFallback, drafts: r.drafts, reason: r.reason };
   }
 
   async produce(id: string) {
     if (this.running.has(id)) throw new Error("视频已在生成中");
     this.running.add(id);
     try {
-      let p = this.store.load(id);
-      const provider = await this.provider(id);
-      const run = await produce({
-        project: p,
-        dir: this.store.dir(id),
-        provider,
-        engine: this.getEngine(),
-        onRun: (r) => {
-          p = this.store.save({ ...this.store.load(id), run: r });
-          this.notify(p);
-        },
-      });
-      p = this.store.load(id);
-      if (run.status === "done") p = this.store.save({ ...p, stale: p.stale.filter((k) => k !== "video"), demo: provider.demo });
-      return p;
+      return await this.runProduce(id);
     } finally {
       this.running.delete(id);
     }
+  }
+
+  /**
+   * One click from idea to video: plan → story concepts → storyboard → production, reusing
+   * whatever is already done and up to date. Progress shows in the video step.
+   */
+  async autopilot(id: string) {
+    return this.logged(id, () => this.autopilotRun(id));
+  }
+
+  /** Runs `fn` with model calls logged to the project's calls.jsonl (for debugging slow or failed runs). */
+  private logged<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    return callLog.run(join(this.store.dir(id), "calls.jsonl"), fn);
+  }
+
+  private async autopilotRun(id: string) {
+    if (this.running.has(id)) throw new Error("视频已在生成中");
+    this.running.add(id);
+    const steps: ProduceStep[] = [...WRITE_STEPS, ...PRODUCE_STEPS].map((s) => ({ ...s, status: "pending", detail: "" }));
+    const run: Run = { status: "running", steps, previews: [], startedAt: new Date().toISOString() };
+    const emit = () => this.notify(this.store.save({ ...this.store.load(id), run: structuredClone(run) }));
+    const set = (key: string, status: ProduceStep["status"], detail = "") => {
+      Object.assign(steps.find((s) => s.key === key)!, { status, detail });
+      emit();
+    };
+    try {
+      emit();
+      let p = this.store.load(id);
+      if (!p.plan || !p.concepts?.length || p.stale.includes("plan")) {
+        set("plan", "running");
+        p = (await this.plan(id, () => {
+          set("plan", "done", this.store.load(id).plan?.oneLiner ?? "");
+          set("concepts", "running", "并行起草、评委打分中…");
+        })).project;
+      }
+      set("plan", "done", p.plan!.oneLiner);
+      const best = chosenConcept(p);
+      set("concepts", "done", best ? `${p.concepts!.length} 个方案，选中「${best.title}」${best.score !== undefined ? `（${best.score} 分）` : ""}` : "");
+      if (!p.scenes?.length || p.stale.includes("storyboard")) {
+        set("storyboard", "running", "3 稿并行起草中…");
+        const r = await this.storyboard(id);
+        p = r.project;
+        set("storyboard", "done", `${p.scenes!.length} 个镜头${r.drafts > 1 ? `，${r.drafts} 稿中选出：${r.reason}` : ""}`);
+      } else set("storyboard", "done", `${p.scenes!.length} 个镜头`);
+      return await this.runProduce(id, steps.slice(0, WRITE_STEPS.length));
+    } catch (err) {
+      const running = steps.find((s) => s.status === "running");
+      if (running) Object.assign(running, { status: "error", detail: (err as Error).message.slice(0, 300) });
+      Object.assign(run, { status: "error", error: (err as Error).message, finishedAt: new Date().toISOString() });
+      emit();
+      return this.store.load(id);
+    } finally {
+      this.running.delete(id);
+    }
+  }
+
+  private async runProduce(id: string, before?: ProduceStep[]) {
+    let p = this.store.load(id);
+    const provider = await this.provider(id);
+    if (!provider.demo) {
+      const voiceId = await this.usableVoice(p.spec);
+      if (voiceId !== p.spec.voiceId) p = this.store.save({ ...p, spec: { ...p.spec, voiceId } });
+    }
+    const run = await produce({
+      project: p,
+      dir: this.store.dir(id),
+      provider,
+      engine: this.getEngine(),
+      before,
+      onRun: (r) => {
+        p = this.store.save({ ...this.store.load(id), run: r });
+        this.notify(p);
+      },
+    });
+    p = this.store.load(id);
+    if (run.status === "done") p = this.store.save({ ...p, stale: p.stale.filter((k) => k !== "video"), demo: provider.demo });
+    return p;
   }
 
   isRunning(id: string) {
@@ -249,3 +381,5 @@ export class Workflow {
     return { bundle, command: this.getEngine().studioCommand() };
   }
 }
+
+const isDemoVoice = (id: string) => id.startsWith("demo");

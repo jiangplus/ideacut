@@ -38,12 +38,18 @@ export const Idea = z.object({
 });
 export type Idea = z.infer<typeof Idea>;
 
+// Stored shapes are lenient: the user can edit anything, including clearing a field.
+// The *Draft schemas hold model output to a higher bar (see writing.ts).
 export const Question = z.object({
   id: z.string(),
-  question: z.string().min(4),
+  question: z.string(),
   why: z.string().default(""),
-  options: z.array(z.string().min(1)).min(2).max(5),
+  options: z.array(z.string()),
   multi: z.boolean().default(false),
+});
+export const QuestionDraft = Question.extend({
+  question: z.string().min(4),
+  options: z.array(z.string().min(1)).min(2).max(5),
 });
 export type Question = z.infer<typeof Question>;
 
@@ -51,6 +57,20 @@ export const Answer = z.object({ questionId: z.string(), choices: z.array(z.stri
 export type Answer = z.infer<typeof Answer>;
 
 export const Plan = z.object({
+  name: z.string(),
+  oneLiner: z.string(),
+  problem: z.string(),
+  audience: z.string(),
+  solution: z.string(),
+  features: z.array(z.string()),
+  howItWorks: z.array(z.string()),
+  differentiation: z.string(),
+  businessModel: z.string(),
+  traction: z.string().default(""),
+  cta: z.string(),
+  contact: z.string().default(""),
+});
+export const PlanDraft = Plan.extend({
   name: z.string().min(1).max(30),
   oneLiner: z.string().min(4).max(60),
   problem: z.string().min(4),
@@ -60,16 +80,53 @@ export const Plan = z.object({
   howItWorks: z.array(z.string().min(2)).length(3),
   differentiation: z.string().min(4),
   businessModel: z.string().min(2),
-  traction: z.string().default(""),
   cta: z.string().min(2),
-  contact: z.string().default(""),
 });
 export type Plan = z.infer<typeof Plan>;
+
+/**
+ * A story direction for the video: one narrative angle on the plan. Many compact ones are
+ * drafted and judged; only the one that gets used is expanded into beats.
+ */
+export const Concept = z.object({
+  id: z.string(),
+  /** Narrative archetype id (see shared/archetypes.ts). */
+  archetype: z.string(),
+  title: z.string(),
+  logline: z.string(),
+  /** The opening spoken line. */
+  hook: z.string(),
+  protagonist: z.string().default(""),
+  /** 4–6 story beats in order; empty until the concept is expanded. */
+  beats: z.array(z.string()).default([]),
+  /** How the ending pays off the opening. */
+  ending: z.string().default(""),
+  /** 0–100 from the judge; absent when unjudged. */
+  score: z.number().optional(),
+  scores: z.record(z.string(), z.number()).optional(),
+  verdict: z.string().default(""),
+});
+export type Concept = z.infer<typeof Concept>;
+
+/** What the model drafts for each concept (stage 1). */
+export const ConceptSeed = z.object({
+  archetype: z.string().optional(),
+  title: z.string().min(2).max(30),
+  hook: z.string().min(2).max(60),
+  logline: z.string().min(6).max(160),
+});
+/** What expanding the chosen concept adds (stage 2). */
+export const ConceptExpansion = z.object({
+  protagonist: z.string().default(""),
+  hook: z.string().min(2).max(60).optional(),
+  beats: z.array(z.string().min(4)).min(4).max(6),
+  ending: z.string().min(4),
+});
 
 export const Scene = z.object({
   id: z.string(),
   template: z.enum(TEMPLATE_IDS as [TemplateId, ...TemplateId[]]),
-  narration: z.string().min(2),
+  narration: z.string(),
   fields: z.record(z.string(), z.unknown()),
 });
 export type Scene = z.infer<typeof Scene>;
@@ -79,6 +136,7 @@ export function sceneIssues(scene: Scene, materials: Material[]): string[] {
   const t = TEMPLATES[scene.template];
   const r = t.fields.safeParse(scene.fields);
   const issues = r.success ? [] : r.error.issues.map((i) => `scene ${scene.id} (${scene.template}) ${i.path.join(".")}: ${i.message}`);
+  if (scene.narration.trim().length < 2) issues.push(`scene ${scene.id}: narration is empty`);
   const image = (scene.fields as { image?: string }).image;
   if (image && !materials.some((m) => m.id === image)) issues.push(`scene ${scene.id}: image "${image}" is not one of the uploaded materials (${materials.map((m) => m.id).join(", ") || "none"})`);
   if (scene.template === "screenshot" && !image) issues.push(`scene ${scene.id}: screenshot needs an image`);
@@ -121,6 +179,9 @@ export const IdeaProject = z.object({
   questions: z.array(Question).optional(),
   answers: z.array(Answer).default([]),
   plan: Plan.optional(),
+  /** Story directions, best first. */
+  concepts: z.array(Concept).optional(),
+  conceptId: z.string().optional(),
   scenes: z.array(Scene).optional(),
   run: Run.optional(),
   /** Which upstream steps changed after a downstream step was produced. */
@@ -138,4 +199,9 @@ export function narrationBudget(spec: Spec): { chars: number; unit: "chars" | "w
 
 export function narrationLength(text: string, language: Spec["language"]): number {
   return language === "zh" ? text.replace(/\s+/g, "").length : text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** The story direction the storyboard follows: the chosen one, else the best ranked. */
+export function chosenConcept(p: Pick<IdeaProject, "concepts" | "conceptId">): Concept | undefined {
+  return p.concepts?.find((c) => c.id === p.conceptId) ?? p.concepts?.[0];
 }

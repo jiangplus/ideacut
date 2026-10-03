@@ -4,6 +4,9 @@
 //   POST /v1/get_voice          voice list
 //   POST /v1/music_generation   background music (not available to new MiniMax users since 2026-08-20)
 
+import { AsyncLocalStorage } from "node:async_hooks";
+import { appendFileSync } from "node:fs";
+
 export const MINIMAX_BASE_URL = "https://api.minimax.io";
 /** International and mainland-China platforms; a key works on only one of them. */
 export const MINIMAX_REGIONS = ["https://api.minimax.io", "https://api.minimaxi.com"];
@@ -11,6 +14,46 @@ export const MINIMAX_REGIONS = ["https://api.minimax.io", "https://api.minimaxi.
 export const TEXT_MODELS = ["MiniMax-M3.1-Flash-Preview", "MiniMax-M3", "MiniMax-M2.7"];
 export const TTS_MODEL = "speech-2.8-hd";
 export const MUSIC_MODEL = "music-3.0";
+
+/**
+ * Per-call settings. Thinking is "off" for drafting and "low" where reasoning helps (judging).
+ * M3's thinking length is unpredictable (1k–16k+ tokens), so every call has a tight token cap
+ * and deadline: a runaway fails fast and cheaply instead of stalling the workflow.
+ */
+export interface ChatOptions {
+  temperature?: number;
+  think?: "off" | "low";
+  maxTokens?: number;
+  timeoutMs?: number;
+  /** For the call log. */
+  task?: string;
+}
+
+/** One line per model call, appended to the file in `callLog`'s store (a project's calls.jsonl). */
+export interface CallRecord {
+  at: string;
+  task: string;
+  model: string;
+  think: string;
+  ms: number;
+  outcome: "ok" | "runaway" | "timeout" | "error";
+  finish?: string;
+  completionTokens?: number;
+  reasoningTokens?: number;
+  answerChars?: number;
+  error?: string;
+}
+export const callLog = new AsyncLocalStorage<string>();
+
+function logCall(rec: CallRecord) {
+  const file = callLog.getStore();
+  if (!file) return;
+  try {
+    appendFileSync(file, `${JSON.stringify(rec)}\n`);
+  } catch {
+    /* logging must never break a call */
+  }
+}
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -34,7 +77,7 @@ export interface Voice {
 /** What the workflow needs from an AI provider; MiniMax in production, a mock in demo mode/tests. */
 export interface Provider {
   readonly demo: boolean;
-  chat(messages: ChatMessage[], opts?: { temperature?: number; maxTokens?: number }): Promise<string>;
+  chat(messages: ChatMessage[], opts?: ChatOptions): Promise<string>;
   speech(text: string, opts: { voiceId: string; language: "zh" | "en"; speed?: number }): Promise<SpeechResult>;
   voices(): Promise<Voice[]>;
   music(prompt: string, seconds: number): Promise<Buffer>;
@@ -45,10 +88,15 @@ export class MiniMaxError extends Error {
     message: string,
     readonly status: number,
     readonly retryable: boolean,
+    /** "runaway": thinking used the whole budget; "timeout": the call's deadline passed. */
+    readonly kind?: "runaway" | "timeout",
   ) {
     super(message);
   }
 }
+
+/** A call that ran out of budget or time; worth one fresh attempt with thinking off. */
+export const isSlow = (err: unknown) => err instanceof MiniMaxError && (err.kind === "runaway" || err.kind === "timeout");
 
 /** Human explanations for MiniMax error codes that need the user to act. */
 function explain(code: number | undefined, http: number, msg: string): string {
@@ -67,7 +115,8 @@ export function isFatal(err: unknown): boolean {
 
 /** Removes <think>…</think> reasoning blocks that M2.x models put in the content. */
 export function stripThinking(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // An answer cut off mid-thought leaves an unclosed block.
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/, "").trim();
 }
 
 export class MiniMax implements Provider {
@@ -105,6 +154,7 @@ export class MiniMax implements Provider {
         signal: ctl.signal,
       });
     } catch (err) {
+      if (ctl.signal.aborted) throw new MiniMaxError(`MiniMax ${path} 超过 ${Math.round(timeoutMs / 1000)} 秒没有回应`, 0, false, "timeout");
       throw new MiniMaxError(`network error calling MiniMax ${path}: ${(err as Error).message}`, 0, true);
     } finally {
       clearTimeout(timer);
@@ -126,19 +176,46 @@ export class MiniMax implements Provider {
     return data;
   }
 
-  async chat(messages: ChatMessage[], opts: { temperature?: number; maxTokens?: number } = {}): Promise<string> {
+  async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
     const model = await this.model();
-    const data = await this.post("/v1/chat/completions", {
-      model,
-      messages,
-      temperature: opts.temperature ?? 0.7,
-      max_completion_tokens: opts.maxTokens ?? 8192,
-      // M3.1 Flash returns reasoning separately; keep it short for structured writing.
-      ...(model.includes("Flash") ? { reasoning_effort: "low" } : {}),
-    });
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== "string") throw new MiniMaxError("MiniMax returned no text", 200, true);
-    return stripThinking(content);
+    const think = opts.think ?? "off";
+    const t0 = Date.now();
+    const rec = (r: Partial<CallRecord>) => logCall({ at: new Date().toISOString(), task: opts.task ?? "chat", model, think, ms: Date.now() - t0, outcome: "ok", ...r });
+    let data: any;
+    try {
+      data = await this.post(
+        "/v1/chat/completions",
+        {
+          model,
+          messages,
+          temperature: opts.temperature ?? 0.7,
+          // Reasoning counts against this cap.
+          max_completion_tokens: opts.maxTokens ?? 8_000,
+          // Flash takes an effort level; M3 takes a switch (M2.x accepts it but may still think
+          // inline, which stripThinking removes).
+          ...(model.includes("Flash") ? { reasoning_effort: "low" } : think === "off" ? { thinking: { type: "disabled" } } : { reasoning_effort: "low" }),
+        },
+        opts.timeoutMs ?? 90_000,
+      );
+    } catch (err) {
+      rec({ outcome: err instanceof MiniMaxError && err.kind === "timeout" ? "timeout" : "error", error: (err as Error).message.slice(0, 200) });
+      throw err;
+    }
+    const choice = data?.choices?.[0];
+    const usage = { finish: choice?.finish_reason, completionTokens: data?.usage?.completion_tokens, reasoningTokens: data?.usage?.completion_tokens_details?.reasoning_tokens };
+    const content = choice?.message?.content;
+    if (typeof content !== "string") {
+      rec({ ...usage, outcome: "error", error: "no text" });
+      throw new MiniMaxError("MiniMax returned no text", 200, true);
+    }
+    const answer = stripThinking(content);
+    // Out of budget: either no answer at all or one cut off mid-JSON. Neither is worth repairing.
+    if (choice.finish_reason === "length") {
+      rec({ ...usage, outcome: "runaway", answerChars: answer.length });
+      throw new MiniMaxError("MiniMax 的回答超出了 token 预算（思考过长或回答被截断）", 200, false, "runaway");
+    }
+    rec({ ...usage, answerChars: answer.length });
+    return answer;
   }
 
   async speech(text: string, opts: { voiceId: string; language: "zh" | "en"; speed?: number }): Promise<SpeechResult> {
