@@ -1,0 +1,77 @@
+src/pipeline/story.ts
+  s_b121c903a8b88f::t_da4ee8861e54a5 4-5,10-11,13,19-21,23-26,28-30,35-36,38-42,44,46,53,63-66,68-75,78-80,82-90,92-97,100-118
+  s_b121c903a8b88f::t_47c15113c26acd 1-3,6-8,12,14-18,27,31-33,37,50-52,54-62,81,91,98-99
+  s_b121c903a8b88f::t_294b774df3207c 9
+  s_b121c903a8b88f::t_b21ea1ac72e53f 22
+  s_b121c903a8b88f::t_3b452194af7bd9 34
+  s_b121c903a8b88f::t_83eb3d9cd19702 43
+  s_b121c903a8b88f::t_043b99387cb7be 45
+  s_b121c903a8b88f::t_567e3b86329b51 47-49
+  s_b121c903a8b88f::t_0135440cd9c9d9 67
+  s_b121c903a8b88f::t_5e45480cde3b02 76-77
+src/pipeline/prompts.ts
+  s_b121c903a8b88f::t_7d65ffd485e76b 213
+  s_b121c903a8b88f::t_d159d02f03745d 1-2,5,7,60-150,155,157,162-174,176-177,181-203,205,214
+package.json
+  s_b121c903a8b88f::t_a333ecc2f53a97 3
+src/main/app.ts
+  s_b121c903a8b88f::t_581c7f59bd98a0 7,56-61,68,91,93
+src/main/workflow.ts
+  s_b121c903a8b88f::t_47b0301001ca89 6,10-12,22,26-32,126,128,141-158,194-197,225-228,235-240,244-248,251-256,258-270,272-277,279,286-316,318-340,346-368,384-385
+src/pipeline/demo.ts
+  s_b121c903a8b88f::t_9a69bfa9b2cdcd 7,10-11,20-21,23-30
+src/pipeline/fallbacks.ts
+  s_b121c903a8b88f::t_f8ea9afcfde640 4-6,77-101,108,110-112,114
+src/pipeline/gather.ts
+  s_b121c903a8b88f::t_0c6279c5f9ae31 1-41
+src/pipeline/llm-json.ts
+  s_b121c903a8b88f::t_7af3337889c429 5-21,66-72,77,79-81,86-87,92-93,97,99-101,112-116
+src/pipeline/minimax.ts
+  s_b121c903a8b88f::t_14b4ef0942d00b 7-9,18-57,80,91-92,98-100,118-119,157,179,181-218
+src/pipeline/pipeline.test.ts
+  s_b121c903a8b88f::t_27e7c632cda823 3,7-13,33,35,37,71-181
+src/pipeline/produce.ts
+  s_b121c903a8b88f::t_53a7c13d8e38c1 31-32,43-44
+src/pipeline/writing.ts
+  s_b121c903a8b88f::t_3adcf45344b4c5 1,4-5,7,10,21,23,32,38-124,134,139-148,152-187,189-195
+src/renderer/api.ts
+  s_b121c903a8b88f::t_bf0c91d9f180ba 44,46
+src/renderer/main.tsx
+  s_b121c903a8b88f::t_41514ae3d31d56 5,12,88,93-102,112-119,197-205
+src/renderer/steps.tsx
+  s_b121c903a8b88f::t_31d3d793e7a9f5 2-3,38-46,52,60-68,94-96,112,148,172-207,210,213-215,220-221,224,231-255,257-259,269-273,368-369,387
+src/renderer/styles.css
+  s_b121c903a8b88f::t_b8c85de361033a 147-171
+src/shared/archetypes.ts
+  s_b121c903a8b88f::t_3afe1bab86559d 1-41
+src/shared/project.ts
+  s_b121c903a8b88f::t_749965fbbc396d 41-42,45,47,50-53,60-73,87-125,129,139,182-184,203-207
+src/shared/templates.ts
+  s_b121c903a8b88f::t_5d11f9d7d0ba7f 15-24
+src/templates/index.ts
+  s_b121c903a8b88f::t_fffa8fe9ebb492 6-7,18
+src/templates/moment.mgx
+  s_b121c903a8b88f::t_fb2b5a9c803265 1-30
+src/templates/quote.mgx
+  s_b121c903a8b88f::t_326ac530eddcfb 1-26
+test/workflow-service.test.ts
+  s_b121c903a8b88f::t_0e1679fa501f39 24-25,30-31,34-38,43-45,57-58,71-81
+vitest.config.ts
+  s_b121c903a8b88f::t_7bc812f5e04c9e 3-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "99fdb4e82562f6e86ccf0c3355b3208dcb70be25",
+  "prompts": {},
+  "sessions": {
+    "s_b121c903a8b88f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8df65980-4011-4757-ab43-63cc17d25afd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "jiangplus <jiang.plus.times@gmail.com>"
+    }
+  }
+}
