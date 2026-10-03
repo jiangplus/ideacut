@@ -1,0 +1,29 @@
+appId: dev.ideacut.app
+productName: IdeaCut
+copyright: Copyright © 2026 IdeaCut
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: build/evercut
+    to: evercut
+  - from: build/ffmpeg
+    to: ffmpeg
+asar: true
+afterPack: scripts/after-pack.cjs
+mac:
+  category: public.app-category.video
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  # No Developer ID certificate yet: ad-hoc signed. Other Macs need right-click → Open the first time.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+dmg:
+  title: IdeaCut

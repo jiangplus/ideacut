@@ -1,0 +1,23 @@
+export default defineMotion({
+  schema: z.object({ line: z.string().default("还在为这件事头疼吗？"), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u } = useLayout();
+    const chars = [...p.line];
+    const shown = Math.min(chars.length, Math.floor(Math.max(0, frame - 6) / 2.2));
+    const cursor = Math.floor(frame / 15) % 2 === 0 || shown < chars.length;
+    const zoom = interpolate(frame, [0, DURATION], [1, 1.12]);
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad style={{ alignItems: "center", transform: `scale(${zoom})` }}>
+          <Title t={p} size={96} style={{ textAlign: "center", maxWidth: "100%" }}>
+            {chars.slice(0, shown).join("")}
+            <span style={{ display: "inline-block", width: 6 * u, height: 90 * u, marginLeft: 8 * u, verticalAlign: "middle", background: p.accent, opacity: cursor ? 1 : 0 }} />
+          </Title>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

@@ -1,0 +1,23 @@
+export default defineMotion({
+  schema: z.object({ name: z.string().default("IdeaCut"), action: z.string().default("现在就试试"), contact: z.string().default(""), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u } = useLayout();
+    const pop = useIn(4, 12);
+    const btn = useIn(18);
+    const pulse = 1 + 0.03 * Math.sin(frame / 8);
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: 44 * u }}>
+          <Title t={p} size={140} style={{ opacity: pop, transform: `scale(${0.7 + 0.3 * pop})`, textAlign: "center" }}>{p.name}</Title>
+          <div style={{ opacity: btn, transform: `scale(${(0.85 + 0.15 * btn) * pulse})`, fontFamily: FONT, fontWeight: 800, fontSize: 50 * u, color: "#fff", padding: `${22 * u}px ${56 * u}px`, borderRadius: 999, background: `linear-gradient(90deg, ${p.accent}, ${p.accent2})`, boxShadow: `0 ${16 * u}px ${50 * u}px ${p.accent}55` }}>
+            {p.action}
+          </div>
+          {p.contact ? <Rise delay={28}><Body t={p} size={38} style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{p.contact}</Body></Rise> : null}
+        </AbsoluteFill>
+      </AbsoluteFill>
+    );
+  },
+});

@@ -1,0 +1,26 @@
+export default defineMotion({
+  schema: z.object({ name: z.string().default("IdeaCut"), tagline: z.string().default("从想法到项目视频，一步到位"), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u, width } = useLayout();
+    const pop = useIn(4, 11);
+    const tag = useIn(20);
+    const line = interpolate(frame, [18, 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+    const size = Math.min(170, (width / u) * 0.85 / Math.max(4, [...p.name].length * 0.62));
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: 36 * u }}>
+          <Title t={p} size={size} style={{ transform: `scale(${0.6 + 0.4 * pop})`, opacity: pop, letterSpacing: -2 * u, textAlign: "center" }}>
+            {p.name}
+          </Title>
+          <div style={{ width: 220 * u * line, height: 8 * u, borderRadius: 4 * u, background: `linear-gradient(90deg, ${p.accent}, ${p.accent2})` }} />
+          <Body t={p} size={48} style={{ opacity: tag * 0.9, transform: `translateY(${(1 - tag) * 24 * u}px)`, textAlign: "center", padding: `0 ${80 * u}px` }}>
+            {p.tagline}
+          </Body>
+        </AbsoluteFill>
+      </AbsoluteFill>
+    );
+  },
+});

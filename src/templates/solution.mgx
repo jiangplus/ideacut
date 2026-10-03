@@ -1,0 +1,38 @@
+export default defineMotion({
+  schema: z.object({ heading: z.string().default("我们的方案"), body: z.string().default("一句话说清楚产品做什么。"), image: z.string().default(""), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u, portrait } = useLayout();
+    const shot = useIn(14);
+    const drift = interpolate(frame, [0, DURATION], [0, -30]);
+    const text = (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 30 * u }}>
+        <Rise><Title t={p} size={p.image ? 70 : 86}>{p.heading}</Title></Rise>
+        <Rise delay={8}><Body t={p} size={p.image ? 40 : 48}>{p.body}</Body></Rise>
+      </div>
+    );
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          {p.image ? (
+            <div style={{ display: "flex", flexDirection: portrait ? "column" : "row", gap: 64 * u, alignItems: "center", height: "100%" }}>
+              {text}
+              <div style={{ flex: portrait ? "none" : 1.25, width: portrait ? "100%" : undefined, opacity: shot, transform: `translateY(${(1 - shot) * 60 * u + drift * u}px) scale(${0.92 + 0.08 * shot})` }}>
+                <div style={{ borderRadius: 22 * u, overflow: "hidden", border: `${2 * u}px solid rgba(255,255,255,0.18)`, boxShadow: `0 ${30 * u}px ${80 * u}px rgba(0,0,0,0.45)`, background: "#000" }}>
+                  <div style={{ height: 34 * u, background: "rgba(255,255,255,0.08)", display: "flex", gap: 10 * u, alignItems: "center", paddingLeft: 16 * u }}>
+                    {["#ff5f57", "#febc2e", "#28c840"].map((c) => <div key={c} style={{ width: 12 * u, height: 12 * u, borderRadius: "50%", background: c }} />)}
+                  </div>
+                  <Img src={p.image} style={{ width: "100%", display: "block" }} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            text
+          )}
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

@@ -1,0 +1,24 @@
+export default defineMotion({
+  schema: z.object({ caption: z.string().default("产品界面"), image: z.string().default(""), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u } = useLayout();
+    const enter = useIn(2, 18);
+    const zoom = interpolate(frame, [0, DURATION], [1.0, 1.18]);
+    const pan = interpolate(frame, [0, DURATION], [0, -6]);
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: 90 * u }}>
+          <div style={{ width: "100%", height: "78%", borderRadius: 26 * u, overflow: "hidden", boxShadow: `0 ${30 * u}px ${90 * u}px rgba(0,0,0,0.5)`, border: `${2 * u}px solid rgba(255,255,255,0.16)`, opacity: enter, transform: `translateY(${(1 - enter) * 80 * u}px)`, background: "#000" }}>
+            {p.image ? <Img src={p.image} style={{ width: "100%", height: "100%", objectFit: "cover", transform: `scale(${zoom}) translateY(${pan}%)` }} /> : null}
+          </div>
+          <Rise delay={14} style={{ marginTop: 34 * u }}>
+            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 44 * u, color: p.fg, background: "rgba(0,0,0,0.35)", padding: `${12 * u}px ${30 * u}px`, borderRadius: 999 }}>{p.caption}</div>
+          </Rise>
+        </AbsoluteFill>
+      </AbsoluteFill>
+    );
+  },
+});

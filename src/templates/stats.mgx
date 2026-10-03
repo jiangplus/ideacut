@@ -1,0 +1,35 @@
+export default defineMotion({
+  schema: z.object({ heading: z.string().default("数据说话"), stats: z.array(z.object({ value: z.string(), label: z.string() })).default([{ value: "3×", label: "效率提升" }, { value: "10万+", label: "目标用户" }]), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u, portrait } = useLayout();
+    // Count up the leading number of each value ("10万+" → 0…10 + "万+").
+    const show = (v: string, i: number) => {
+      const m = v.match(/^([\d.]+)(.*)$/);
+      if (!m) return v;
+      const target = Number(m[1]);
+      const t = interpolate(frame, [12 + i * 8, 48 + i * 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+      const decimals = (m[1]!.split(".")[1] ?? "").length;
+      return `${(target * t).toFixed(decimals)}${m[2]}`;
+    };
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          <Rise><Title t={p} size={72}>{p.heading}</Title></Rise>
+          <div style={{ display: "flex", flexDirection: portrait ? "column" : "row", gap: 40 * u, marginTop: 70 * u }}>
+            {p.stats.map((s, i) => (
+              <Rise key={i} delay={8 + i * 8} style={{ flex: 1 }}>
+                <Card t={p}>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 120 * u, lineHeight: 1, background: `linear-gradient(90deg, ${p.accent}, ${p.accent2})`, WebkitBackgroundClip: "text", color: "transparent" }}>{show(s.value, i)}</div>
+                  <Body t={p} size={38} style={{ marginTop: 16 * u }}>{s.label}</Body>
+                </Card>
+              </Rise>
+            ))}
+          </div>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

@@ -1,0 +1,29 @@
+export default defineMotion({
+  schema: z.object({ heading: z.string().default("三步完成"), steps: z.array(z.string()).default(["输入想法", "自动生成", "一键分享"]), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const frame = useCurrentFrame();
+    const { u, portrait } = useLayout();
+    const line = interpolate(frame, [14, 60], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          <Rise><Title t={p} size={76}>{p.heading}</Title></Rise>
+          <div style={{ position: "relative", display: "flex", flexDirection: portrait ? "column" : "row", gap: portrait ? 48 * u : 40 * u, marginTop: 80 * u }}>
+            {!portrait && <div style={{ position: "absolute", left: "8%", top: 48 * u, height: 6 * u, width: `${84 * line}%`, background: `linear-gradient(90deg, ${p.accent}, ${p.accent2})`, borderRadius: 3 * u }} />}
+            {p.steps.map((s, i) => {
+              const on = useIn(16 + i * 14);
+              return (
+                <div key={i} style={{ flex: 1, display: "flex", flexDirection: portrait ? "row" : "column", alignItems: "center", gap: 26 * u, opacity: on, transform: `scale(${0.8 + 0.2 * on})` }}>
+                  <div style={{ width: 100 * u, height: 100 * u, borderRadius: "50%", display: "grid", placeItems: "center", background: p.accent, color: p.bg, fontFamily: FONT, fontWeight: 800, fontSize: 48 * u, flexShrink: 0, position: "relative" }}>{i + 1}</div>
+                  <Body t={p} size={44} style={{ opacity: 1, fontWeight: 700, textAlign: portrait ? "left" : "center" }}>{s}</Body>
+                </div>
+              );
+            })}
+          </div>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

@@ -1,0 +1,25 @@
+export default defineMotion({
+  schema: z.object({ heading: z.string().default("现在的做法太累了"), points: z.array(z.string()).default(["耗时太长", "成本太高", "效果难保证"]), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const { u, portrait } = useLayout();
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          <Rise><Title t={p} size={76}>{p.heading}</Title></Rise>
+          <div style={{ display: "flex", flexDirection: portrait ? "column" : "row", gap: 28 * u, marginTop: 64 * u }}>
+            {p.points.map((pt, i) => (
+              <Rise key={i} delay={12 + i * 9} style={{ flex: 1 }}>
+                <Card t={p} style={{ minHeight: portrait ? 0 : 220 * u, display: "flex", flexDirection: "column", gap: 18 * u }}>
+                  <div style={{ fontFamily: FONT, fontSize: 44 * u, fontWeight: 800, color: p.accent }}>✕</div>
+                  <Body t={p} size={42} style={{ opacity: 1, fontWeight: 700 }}>{pt}</Body>
+                </Card>
+              </Rise>
+            ))}
+          </div>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

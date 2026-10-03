@@ -1,0 +1,32 @@
+export default defineMotion({
+  schema: z.object({ heading: z.string().default("为什么选我们"), them: z.array(z.string()).default(["流程繁琐", "价格昂贵"]), us: z.array(z.string()).default(["一步完成", "按需付费"]), themLabel: z.string().default("其他方案"), usLabel: z.string().default("我们"), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const { u, portrait } = useLayout();
+    const col = (title: string, items: string[], good: boolean, delay: number) => (
+      <Rise delay={delay} style={{ flex: 1 }}>
+        <Card t={p} style={{ height: "100%", background: good ? `linear-gradient(160deg, ${p.accent}2e, ${p.accent2}22)` : "rgba(255,255,255,0.05)", borderColor: good ? p.accent : "rgba(255,255,255,0.12)" }}>
+          <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 40 * u, color: good ? p.accent : p.fg, opacity: good ? 1 : 0.6, marginBottom: 24 * u }}>{title}</div>
+          {items.map((it, i) => (
+            <div key={i} style={{ display: "flex", gap: 18 * u, alignItems: "center", marginTop: 14 * u }}>
+              <span style={{ fontSize: 36 * u, color: good ? p.accent : "#ff6b6b" }}>{good ? "✓" : "✕"}</span>
+              <Body t={p} size={38} style={{ opacity: good ? 1 : 0.6, fontWeight: good ? 700 : 500 }}>{it}</Body>
+            </div>
+          ))}
+        </Card>
+      </Rise>
+    );
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          <Rise><Title t={p} size={72}>{p.heading}</Title></Rise>
+          <div style={{ display: "flex", flexDirection: portrait ? "column" : "row", gap: 34 * u, marginTop: 56 * u }}>
+            {col(p.themLabel, p.them, false, 10)}
+            {col(p.usLabel, p.us, true, 20)}
+          </div>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

@@ -1,0 +1,26 @@
+export default defineMotion({
+  schema: z.object({ heading: z.string().default("核心功能"), items: z.array(z.object({ icon: z.string(), text: z.string() })).default([{ icon: "⚡", text: "快" }, { icon: "🎯", text: "准" }, { icon: "🧩", text: "简单" }]), ...theme }),
+  durationInFrames: DURATION,
+  component: (p) => {
+    const { u, portrait } = useLayout();
+    const cols = portrait ? 1 : p.items.length === 4 ? 2 : p.items.length;
+    return (
+      <AbsoluteFill>
+        <Backdrop t={p} />
+        <Pad>
+          <Rise><Title t={p} size={76}>{p.heading}</Title></Rise>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 26 * u, marginTop: 56 * u }}>
+            {p.items.map((it, i) => (
+              <Rise key={i} delay={10 + i * 8}>
+                <Card t={p} style={{ display: "flex", alignItems: "center", gap: 26 * u }}>
+                  <div style={{ fontSize: 64 * u, width: 96 * u, height: 96 * u, borderRadius: 24 * u, display: "grid", placeItems: "center", background: `linear-gradient(135deg, ${p.accent}33, ${p.accent2}33)` }}>{it.icon}</div>
+                  <Body t={p} size={42} style={{ opacity: 1, fontWeight: 700 }}>{it.text}</Body>
+                </Card>
+              </Rise>
+            ))}
+          </div>
+        </Pad>
+      </AbsoluteFill>
+    );
+  },
+});

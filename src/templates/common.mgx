@@ -1,0 +1,79 @@
+// IdeaCut template kit — shared header prepended to every scene template.
+import { z } from "zod";
+import { AbsoluteFill, Img, defineMotion, interpolate, spring, useCurrentFrame, useVideoConfig, Easing } from "@evercut/motion";
+
+const theme = {
+  bg: z.string().default("#0d0d0d"),
+  fg: z.string().default("#f2f2f2"),
+  accent: z.string().default("#17a9f3"),
+  accent2: z.string().default("#7c5cff"),
+  grad1: z.string().default("#0b1e3a"),
+  grad2: z.string().default("#0d0d0d"),
+  grad3: z.string().default("#2a1240"),
+};
+type Theme = { bg: string; fg: string; accent: string; accent2: string; grad1: string; grad2: string; grad3: string };
+
+const FONT = "Inter, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif";
+const DURATION = 900;
+
+/** Layout unit: 1u = 1px at 1080 on the short side, so text scales with any canvas. */
+function useLayout() {
+  const { width, height, fps } = useVideoConfig();
+  const u = Math.min(width, height) / 1080;
+  return { width, height, fps, u, portrait: height > width };
+}
+
+/** Eased entrance 0→1 starting at `delay` frames. */
+function useIn(delay = 0, damping = 16) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return spring({ frame: frame - delay, fps, config: { damping, mass: 0.9 } });
+}
+
+/** Slowly drifting gradient blobs behind every scene. */
+function Backdrop({ t }: { t: Theme }) {
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const d = Math.max(width, height);
+  const a = frame / 90;
+  const blob = (cx: number, cy: number, r: number, color: string) => (
+    <div style={{ position: "absolute", left: cx - r, top: cy - r, width: r * 2, height: r * 2, borderRadius: "50%", background: `radial-gradient(circle, ${color} 0%, transparent 68%)`, opacity: 0.9 }} />
+  );
+  return (
+    <AbsoluteFill style={{ background: t.bg, overflow: "hidden" }}>
+      {blob(width * (0.2 + 0.05 * Math.sin(a)), height * (0.25 + 0.05 * Math.cos(a * 0.8)), d * 0.55, t.grad1)}
+      {blob(width * (0.85 + 0.04 * Math.cos(a * 0.7)), height * (0.75 + 0.06 * Math.sin(a * 0.9)), d * 0.5, t.grad3)}
+      {blob(width * 0.55, height * 0.45, d * 0.35, t.grad2)}
+    </AbsoluteFill>
+  );
+}
+
+function Rise({ delay = 0, children, style }: { delay?: number; children: any; style?: any }) {
+  const p = useIn(delay);
+  const { u } = useLayout();
+  return <div style={{ opacity: p, transform: `translateY(${(1 - p) * 40 * u}px)`, ...style }}>{children}</div>;
+}
+
+function Title({ t, children, size = 84, style }: { t: Theme; children: any; size?: number; style?: any }) {
+  const { u } = useLayout();
+  return <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: size * u, lineHeight: 1.15, letterSpacing: -0.5 * u, color: t.fg, ...style }}>{children}</div>;
+}
+
+function Body({ t, children, size = 40, style }: { t: Theme; children: any; size?: number; style?: any }) {
+  const { u } = useLayout();
+  return <div style={{ fontFamily: FONT, fontWeight: 500, fontSize: size * u, lineHeight: 1.45, color: t.fg, opacity: 0.86, ...style }}>{children}</div>;
+}
+
+function Card({ t, children, style }: { t: Theme; children: any; style?: any }) {
+  const { u } = useLayout();
+  return (
+    <div style={{ background: "rgba(255,255,255,0.07)", border: `${1.5 * u}px solid rgba(255,255,255,0.14)`, borderRadius: 28 * u, padding: `${34 * u}px ${40 * u}px`, backdropFilter: "none", boxShadow: `0 ${20 * u}px ${60 * u}px rgba(0,0,0,0.25)`, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function Pad({ children, style }: { children: any; style?: any }) {
+  const { u, portrait } = useLayout();
+  return <AbsoluteFill style={{ padding: portrait ? `${180 * u}px ${80 * u}px` : `${110 * u}px ${150 * u}px`, justifyContent: "center", ...style }}>{children}</AbsoluteFill>;
+}
